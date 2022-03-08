@@ -3,23 +3,43 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/fedesog/webdriver"
+	"github.com/joho/godotenv"
 	"github.com/tebeka/selenium"
 )
 
+var contries []string
+var session webdriver.Session
+
 func main() {
-	videoNumber := 100
-	session := setupWebDriver()
-	goToTheShort(session)
+	contries = []string{"Japan", "South Korea"}
+	videoCounts := 100
+	godotenv.Load("/Users/dooboolab/GoProjects/video-crawler/.env")
 
-	for i := 1; i <= videoNumber; i++ {
-		currentURL := getCurrnetShortUrl(session)
-		fmt.Println(currentURL)
+	session = setupWebDriver()
 
+	goToTheSignInPage()
+	signIn()
+
+	for _, contry := range contries {
+		selectTheContry(contry)
+
+		time.Sleep(3 * time.Second)
+		session.Refresh()
 		time.Sleep(1 * time.Second)
-		goToTheNextShort(session)
+
+		goToTheShort()
+
+		for i := 1; i <= videoCounts; i++ {
+			currentURL := getCurrnetShortUrl()
+			fmt.Println(currentURL)
+
+			time.Sleep(1 * time.Second)
+			goToTheNextShort()
+		}
 	}
 }
 
@@ -40,21 +60,80 @@ func setupWebDriver() webdriver.Session {
 	session, err := chromedriver.NewSession(desired, required)
 	checkErr(err)
 
+	openURL := session.Url("https://www.youtube.com/")
+	checkErr(openURL)
+	session.SetTimeoutsImplicitWait(3000)
+
 	return *session
 }
 
-func goToTheShort(session webdriver.Session) {
-	openURL := session.Url("https://www.youtube.com/")
-	checkErr(openURL)
+func goToTheSignInPage() {
+	signInButton, err := session.FindElement(selenium.ByCSSSelector, "tp-yt-paper-button[aria-label='Sign in']")
+	checkErr(err)
+	signInButton.Click()
+}
 
-	session.SetTimeoutsImplicitWait(3000)
+func signIn() {
+	inputEmail, err := session.FindElement(selenium.ByCSSSelector, "input[type='email']")
+	checkErr(err)
+
+	email := os.Getenv("USER_ID")
+	inputEmail.SendKeys(email)
+
+	nextButton, err := session.FindElement(selenium.ByCSSSelector, "#identifierNext")
+	checkErr(err)
+	nextButton.Click()
+
+	time.Sleep(2 * time.Second)
+	inputPassword, err := session.FindElement(selenium.ByCSSSelector, "input[type='password']")
+	checkErr(err)
+	password := os.Getenv("USER_PW")
+	inputPassword.SendKeys(password)
+
+	signInButton, err := session.FindElement(selenium.ByCSSSelector, "#passwordNext")
+	checkErr(err)
+	signInButton.Click()
+	time.Sleep(1 * time.Second)
+}
+
+func selectTheContry(country string) {
+	profileButton, err := session.FindElement(selenium.ByCSSSelector, "#avatar-btn")
+	checkErr(err)
+	profileButton.Click()
+
+	locationButton, err := session.FindElements(selenium.ByCSSSelector, "#endpoint > tp-yt-paper-item")
+	checkErr(err)
+	locationButton[6].Click()
+
+	locations, err := session.FindElements(selenium.ByCSSSelector, "#items #endpoint yt-formatted-string[id='label']")
+	checkErr(err)
+	index, isFound := findTheCuntryIndex(locations, country)
+	if isFound {
+		locations[index].Click()
+	}
+}
+
+func findTheCuntryIndex(locations []webdriver.WebElement, country string) (int, bool) {
+	for i, location := range locations {
+		text, err := location.Text()
+		checkErr(err)
+		fmt.Println(i, text)
+		if text == country {
+			return i, true
+		}
+	}
+
+	return -1, false
+}
+
+func goToTheShort() {
 	btn, err := session.FindElement(selenium.ByCSSSelector, "a[title='Shorts']")
 	checkErr(err)
 
 	btn.Click()
 }
 
-func getCurrnetShortUrl(session webdriver.Session) string {
+func getCurrnetShortUrl() string {
 	time.Sleep(1000 * time.Millisecond)
 
 	currentURL, err := session.GetUrl()
@@ -63,7 +142,7 @@ func getCurrnetShortUrl(session webdriver.Session) string {
 	return currentURL
 }
 
-func goToTheNextShort(session webdriver.Session) {
+func goToTheNextShort() {
 	nextButton, err := session.FindElement(selenium.ByCSSSelector, "button[aria-label='Next video']")
 	checkErr(err)
 
