@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/csv"
 	"fmt"
 	"log"
 	"os"
@@ -15,8 +16,8 @@ var contries []string
 var session webdriver.Session
 
 func main() {
-	contries = []string{"Japan", "South Korea"}
-	videoCounts := 100
+	contries = []string{"Japan", "United Kingdom", "South Korea", "United States"}
+	videoCounts := 30
 	godotenv.Load("/Users/dooboolab/GoProjects/video-crawler/.env")
 
 	session = setupWebDriver()
@@ -24,10 +25,16 @@ func main() {
 	goToTheSignInPage()
 	signIn()
 
+	// fileName := createTheCSV()
+	// f, err := os.Create(fileName)
+	// checkErr(err)
+
+	f, w := createTheCSV()
+
 	for _, contry := range contries {
 		selectTheContry(contry)
 
-		time.Sleep(3 * time.Second)
+		time.Sleep(4 * time.Second)
 		session.Refresh()
 		time.Sleep(1 * time.Second)
 
@@ -36,11 +43,17 @@ func main() {
 		for i := 1; i <= videoCounts; i++ {
 			currentURL := getCurrnetShortUrl()
 			fmt.Println(currentURL)
+			data := []string{currentURL, currentURL, contry}
+
+			w.Write(data)
+			w.Flush()
 
 			time.Sleep(1 * time.Second)
 			goToTheNextShort()
 		}
 	}
+
+	f.Close()
 }
 
 func checkErr(err error) {
@@ -147,4 +160,19 @@ func goToTheNextShort() {
 	checkErr(err)
 
 	nextButton.Click()
+}
+
+func createTheCSV() (*os.File, *csv.Writer) {
+	currentTime := time.Now()
+	fileName := currentTime.Format("2006-01-02") + ".csv"
+	f, err := os.Create(fileName)
+	checkErr(err)
+
+	w := csv.NewWriter(f)
+
+	title := []string{"id", "url", "state"}
+	w.Write(title)
+	w.Flush()
+
+	return f, w
 }
